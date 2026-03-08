@@ -3,7 +3,7 @@ header("Content-Type: application/json; charset=UTF-8");
 date_default_timezone_set('Asia/Bangkok');
 
 require_once "config.php";
-require_once "auth_helper.php";
+require_once "auth.php";
 
 $user = requireAuth($pdo);
 
@@ -15,12 +15,9 @@ try {
     $stmt = $pdo->prepare("
         SELECT
             s.saved_id,
-            s.created_at AS saved_at,
-            r.restaurant_id,
+            s.restaurant_id,
             r.restaurant_name,
             r.address,
-            r.lat,
-            r.lng,
             r.avg_price
         FROM saved s
         INNER JOIN restaurants r ON r.restaurant_id = s.restaurant_id
@@ -37,7 +34,7 @@ try {
 
     echo json_encode([
         "ok" => true,
-        "message" => "ดึงร้านที่บันทึกไว้สำเร็จ",
+        "message" => "ดึงรายการร้านที่บันทึกไว้สำเร็จ",
         "count" => count($rows),
         "saved_restaurants" => $rows
     ], JSON_UNESCAPED_UNICODE);
@@ -47,7 +44,7 @@ try {
     http_response_code(500);
     echo json_encode([
         "ok" => false,
-        "message" => "ดึงร้านที่บันทึกไว้ไม่สำเร็จ",
+        "message" => "ดึงรายการร้านที่บันทึกไว้ไม่สำเร็จ",
         "error" => $e->getMessage()
     ], JSON_UNESCAPED_UNICODE);
     exit;

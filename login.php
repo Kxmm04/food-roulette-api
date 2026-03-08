@@ -13,10 +13,7 @@ $password = $input["password"] ?? "";
 
 if ($email === "" || $password === "") {
     http_response_code(400);
-    echo json_encode([
-        "ok" => false,
-        "message" => "กรุณากรอก email และ password"
-    ], JSON_UNESCAPED_UNICODE);
+    echo json_encode(["ok"=>false,"message"=>"กรุณากรอกอีเมลและรหัสผ่าน"], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -32,31 +29,30 @@ try {
 
     if (!$user || !password_verify($password, $user["password_hash"])) {
         http_response_code(401);
-        echo json_encode([
-            "ok" => false,
-            "message" => "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
-        ], JSON_UNESCAPED_UNICODE);
+        echo json_encode(["ok"=>false,"message"=>"อีเมลหรือรหัสผ่านไม่ถูกต้อง"], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
+    // สร้าง token อายุ 7 วัน
     $token = bin2hex(random_bytes(32));
     $expires_at = date("Y-m-d H:i:s", strtotime("+7 days"));
 
-    $insert = $pdo->prepare("
-        INSERT INTO tokens (user_id, token, expires_at)
-        VALUES (:user_id, :token, :expires_at)
+    // ถ้า tokens ของคุณไม่มี created_at ให้ลบ created_at, NOW() ออก
+    $ins = $pdo->prepare("
+        INSERT INTO tokens (user_id, token, expires_at, created_at)
+        VALUES (:user_id, :token, :expires_at, NOW())
     ");
-    $insert->execute([
-        ":user_id" => $user["user_id"],
+    $ins->execute([
+        ":user_id" => (int)$user["user_id"],
         ":token" => $token,
         ":expires_at" => $expires_at
     ]);
 
-    http_response_code(200);
     echo json_encode([
         "ok" => true,
         "message" => "เข้าสู่ระบบสำเร็จ",
         "token" => $token,
+        "expires_at" => $expires_at,
         "user" => [
             "user_id" => (int)$user["user_id"],
             "full_name" => $user["full_name"],

@@ -3,14 +3,12 @@ header("Content-Type: application/json; charset=UTF-8");
 date_default_timezone_set('Asia/Bangkok');
 
 require_once "config.php";
-require_once "auth_helper.php";
+require_once "auth.php";
 
 $user = requireAuth($pdo);
 
 $restaurant_id = isset($_GET["restaurant_id"]) ? (int)$_GET["restaurant_id"] : 0;
 $limit = isset($_GET["limit"]) ? (int)$_GET["limit"] : 100;
-if ($limit <= 0) $limit = 100;
-if ($limit > 500) $limit = 500;
 
 if ($restaurant_id <= 0) {
     http_response_code(400);
@@ -21,10 +19,18 @@ if ($restaurant_id <= 0) {
     exit;
 }
 
+if ($limit <= 0) $limit = 100;
+if ($limit > 500) $limit = 500;
+
 try {
-    // เช็คว่าร้านมีจริง
-    $chk = $pdo->prepare("SELECT restaurant_id, restaurant_name FROM restaurants WHERE restaurant_id = :id LIMIT 1");
-    $chk->execute([":id" => $restaurant_id]);
+    // เช็คร้านว่ามีจริงไหม
+    $chk = $pdo->prepare("
+        SELECT restaurant_id, restaurant_name
+        FROM restaurants
+        WHERE restaurant_id = :restaurant_id
+        LIMIT 1
+    ");
+    $chk->execute([":restaurant_id" => $restaurant_id]);
     $restaurant = $chk->fetch(PDO::FETCH_ASSOC);
 
     if (!$restaurant) {
@@ -37,12 +43,18 @@ try {
     }
 
     $stmt = $pdo->prepare("
-        SELECT menu_id, restaurant_id, menu_name, price, is_available, created_at
+        SELECT
+            menu_id,
+            restaurant_id,
+            menu_name,
+            price,
+            is_available
         FROM menus
         WHERE restaurant_id = :restaurant_id
         ORDER BY menu_id DESC
         LIMIT :lim
     ");
+
     $stmt->bindValue(":restaurant_id", $restaurant_id, PDO::PARAM_INT);
     $stmt->bindValue(":lim", $limit, PDO::PARAM_INT);
     $stmt->execute();
@@ -51,8 +63,11 @@ try {
 
     echo json_encode([
         "ok" => true,
-        "message" => "ดึงเมนูสำเร็จ",
-        "restaurant" => $restaurant,
+        "message" => "ดึงรายการเมนูสำเร็จ",
+        "restaurant" => [
+            "restaurant_id" => (int)$restaurant["restaurant_id"],
+            "restaurant_name" => $restaurant["restaurant_name"]
+        ],
         "count" => count($menus),
         "menus" => $menus
     ], JSON_UNESCAPED_UNICODE);
@@ -62,7 +77,7 @@ try {
     http_response_code(500);
     echo json_encode([
         "ok" => false,
-        "message" => "ดึงเมนูไม่สำเร็จ",
+        "message" => "ดึงรายการเมนูไม่สำเร็จ",
         "error" => $e->getMessage()
     ], JSON_UNESCAPED_UNICODE);
     exit;

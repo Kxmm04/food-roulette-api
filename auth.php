@@ -29,7 +29,6 @@ function getBearerToken() {
     if (preg_match('/Bearer\s+(.*)$/i', $auth, $matches)) {
         return trim($matches[1]);
     }
-
     return null;
 }
 
@@ -38,13 +37,11 @@ function requireAuth($pdo) {
 
     if (!$token) {
         http_response_code(401);
-        echo json_encode([
-            "ok" => false,
-            "message" => "กรุณาเข้าสู่ระบบ (ไม่พบ token)"
-        ], JSON_UNESCAPED_UNICODE);
+        echo json_encode(["ok"=>false,"message"=>"กรุณาเข้าสู่ระบบ (ไม่พบ token)"], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
+    // ตาราง tokens ต้องมี: token, user_id, expires_at
     $stmt = $pdo->prepare("
         SELECT u.user_id, u.full_name, u.email, t.expires_at
         FROM tokens t
@@ -58,10 +55,7 @@ function requireAuth($pdo) {
 
     if (!$user) {
         http_response_code(401);
-        echo json_encode([
-            "ok" => false,
-            "message" => "Token ไม่ถูกต้องหรือหมดอายุ"
-        ], JSON_UNESCAPED_UNICODE);
+        echo json_encode(["ok"=>false,"message"=>"Token ไม่ถูกต้องหรือหมดอายุ"], JSON_UNESCAPED_UNICODE);
         exit;
     }
 

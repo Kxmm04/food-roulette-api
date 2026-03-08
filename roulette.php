@@ -3,7 +3,7 @@ header("Content-Type: application/json; charset=UTF-8");
 date_default_timezone_set('Asia/Bangkok');
 
 require_once "config.php";
-require_once "auth_helper.php";
+require_once "auth.php";
 
 $user = requireAuth($pdo);
 
@@ -36,13 +36,11 @@ if ($budget_min < 0 || $budget_max < $budget_min) {
     echo json_encode(["ok"=>false,"message"=>"งบประมาณไม่ถูกต้อง"], JSON_UNESCAPED_UNICODE);
     exit;
 }
-
 if ($max_distance_km <= 0) {
     http_response_code(400);
     echo json_encode(["ok"=>false,"message"=>"กรุณาระบุระยะทางมากกว่า 0 กม."], JSON_UNESCAPED_UNICODE);
     exit;
 }
-
 if ($user_lat === null || $user_lng === null) {
     http_response_code(400);
     echo json_encode(["ok"=>false,"message"=>"กรุณาระบุ user_lat และ user_lng"], JSON_UNESCAPED_UNICODE);
@@ -50,7 +48,7 @@ if ($user_lat === null || $user_lng === null) {
 }
 
 try {
-    // ดึงเมนูจากร้านที่ user บันทึกไว้ + ราคาอยู่ในงบ
+    // ดึงเมนูจากร้านที่บันทึกไว้ + ราคาอยู่ในงบ
     $stmt = $pdo->prepare("
         SELECT
             r.restaurant_id,
@@ -58,7 +56,7 @@ try {
             r.address,
             r.lat,
             r.lng,
-            r.avg_price,
+
             m.menu_id,
             m.menu_name,
             m.price
@@ -94,17 +92,18 @@ try {
         $dist = haversineKm($user_lat, $user_lng, (float)$row["lat"], (float)$row["lng"]);
         if ($dist <= $max_distance_km) {
             $candidates[] = [
-                "restaurant_id" => (int)$row["restaurant_id"],
-                "restaurant_name" => $row["restaurant_name"],
-                "address" => $row["address"],
-                "lat" => (float)$row["lat"],
-                "lng" => (float)$row["lng"],
-                "avg_price" => $row["avg_price"] !== null ? (int)$row["avg_price"] : null,
-
-                "menu_id" => (int)$row["menu_id"],
-                "menu_name" => $row["menu_name"],
-                "price" => (int)$row["price"],
-
+                "restaurant" => [
+                    "restaurant_id" => (int)$row["restaurant_id"],
+                    "restaurant_name" => $row["restaurant_name"],
+                    "address" => $row["address"],
+                    "lat" => (float)$row["lat"],
+                    "lng" => (float)$row["lng"],
+                ],
+                "menu" => [
+                    "menu_id" => (int)$row["menu_id"],
+                    "menu_name" => $row["menu_name"],
+                    "price" => (int)$row["price"]
+                ],
                 "distance_km" => round($dist, 2)
             ];
         }
@@ -128,26 +127,9 @@ try {
         "filters" => [
             "budget_min" => $budget_min,
             "budget_max" => $budget_max,
-            "max_distance_km" => $max_distance_km,
-            "user_lat" => $user_lat,
-            "user_lng" => $user_lng
+            "max_distance_km" => $max_distance_km
         ],
-        "result" => [
-            "restaurant" => [
-                "restaurant_id" => $pick["restaurant_id"],
-                "restaurant_name" => $pick["restaurant_name"],
-                "address" => $pick["address"],
-                "lat" => $pick["lat"],
-                "lng" => $pick["lng"],
-                "avg_price" => $pick["avg_price"]
-            ],
-            "menu" => [
-                "menu_id" => $pick["menu_id"],
-                "menu_name" => $pick["menu_name"],
-                "price" => $pick["price"]
-            ],
-            "distance_km" => $pick["distance_km"]
-        ]
+        "result" => $pick
     ], JSON_UNESCAPED_UNICODE);
     exit;
 

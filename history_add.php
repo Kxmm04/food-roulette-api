@@ -3,7 +3,7 @@ header("Content-Type: application/json; charset=UTF-8");
 date_default_timezone_set('Asia/Bangkok');
 
 require_once "config.php";
-require_once "auth_helper.php";
+require_once "auth.php";
 
 $user = requireAuth($pdo);
 
@@ -35,7 +35,7 @@ if ($price < 0 || $distance_km < 0) {
 }
 
 try {
-    // เช็คว่า menu อยู่ในร้านนั้นจริง (กันมั่ว)
+    // เช็คว่า menu อยู่ในร้านนั้นจริง
     $chk = $pdo->prepare("
         SELECT m.menu_id, m.menu_name, m.price, r.restaurant_id, r.restaurant_name
         FROM menus m
@@ -60,8 +60,8 @@ try {
     }
 
     $ins = $pdo->prepare("
-        INSERT INTO history (user_id, restaurant_id, menu_id, price, distance_km)
-        VALUES (:user_id, :restaurant_id, :menu_id, :price, :distance_km)
+        INSERT INTO history (user_id, restaurant_id, menu_id, price, distance_km, eaten_at)
+        VALUES (:user_id, :restaurant_id, :menu_id, :price, :distance_km, NOW())
     ");
     $ins->execute([
         ":user_id" => (int)$user["user_id"],

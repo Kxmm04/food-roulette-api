@@ -3,7 +3,7 @@ header("Content-Type: application/json; charset=UTF-8");
 date_default_timezone_set('Asia/Bangkok');
 
 require_once "config.php";
-require_once "auth_helper.php";
+require_once "auth.php";
 
 $user = requireAuth($pdo);
 

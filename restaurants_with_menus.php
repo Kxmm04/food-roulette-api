@@ -3,7 +3,7 @@ header("Content-Type: application/json; charset=UTF-8");
 date_default_timezone_set('Asia/Bangkok');
 
 require_once "config.php";
-require_once "auth_helper.php";
+require_once "auth.php";
 
 $user = requireAuth($pdo);
 
@@ -51,7 +51,7 @@ try {
                 "menu_id" => (int)$row["menu_id"],
                 "menu_name" => $row["menu_name"],
                 "price" => (int)$row["price"],
-                "is_available" => (int)$row["is_available"],
+                "is_available" => (int)$row["is_available"]
             ];
         }
     }

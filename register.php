@@ -14,65 +14,50 @@ $password = $input["password"] ?? "";
 
 if ($full_name === "" || $email === "" || $password === "") {
     http_response_code(400);
-    echo json_encode([
-        "ok" => false,
-        "message" => "กรุณากรอก full_name, email, password ให้ครบ"
-    ], JSON_UNESCAPED_UNICODE);
+    echo json_encode(["ok"=>false,"message"=>"กรุณากรอกชื่อ อีเมล และรหัสผ่าน"], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     http_response_code(400);
-    echo json_encode([
-        "ok" => false,
-        "message" => "รูปแบบอีเมลไม่ถูกต้อง"
-    ], JSON_UNESCAPED_UNICODE);
+    echo json_encode(["ok"=>false,"message"=>"รูปแบบอีเมลไม่ถูกต้อง"], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 if (strlen($password) < 6) {
     http_response_code(400);
-    echo json_encode([
-        "ok" => false,
-        "message" => "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร"
-    ], JSON_UNESCAPED_UNICODE);
+    echo json_encode(["ok"=>false,"message"=>"รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร"], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 try {
-    // check email ซ้ำ
-    $check = $pdo->prepare("SELECT user_id FROM users WHERE email = :email LIMIT 1");
-    $check->execute([":email" => $email]);
-    if ($check->fetch()) {
+    // เช็คอีเมลซ้ำ
+    $chk = $pdo->prepare("SELECT user_id FROM users WHERE email = :email LIMIT 1");
+    $chk->execute([":email" => $email]);
+    if ($chk->fetch()) {
         http_response_code(409);
-        echo json_encode([
-            "ok" => false,
-            "message" => "อีเมลนี้ถูกใช้งานแล้ว"
-        ], JSON_UNESCAPED_UNICODE);
+        echo json_encode(["ok"=>false,"message"=>"อีเมลนี้ถูกใช้งานแล้ว"], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    $password_hash = password_hash($password, PASSWORD_DEFAULT);
+    $hash = password_hash($password, PASSWORD_BCRYPT);
 
-    $stmt = $pdo->prepare("
-        INSERT INTO users (full_name, email, password_hash)
-        VALUES (:full_name, :email, :password_hash)
+    // ถ้า users ของคุณไม่มี created_at ให้ลบ created_at, NOW() ออก
+    $ins = $pdo->prepare("
+        INSERT INTO users (full_name, email, password_hash, created_at)
+        VALUES (:full_name, :email, :password_hash, NOW())
     ");
-    $stmt->execute([
+    $ins->execute([
         ":full_name" => $full_name,
         ":email" => $email,
-        ":password_hash" => $password_hash
+        ":password_hash" => $hash
     ]);
 
     http_response_code(201);
     echo json_encode([
         "ok" => true,
         "message" => "สมัครสมาชิกสำเร็จ",
-        "user" => [
-            "user_id" => (int)$pdo->lastInsertId(),
-            "full_name" => $full_name,
-            "email" => $email
-        ]
+        "user_id" => (int)$pdo->lastInsertId()
     ], JSON_UNESCAPED_UNICODE);
     exit;
 
