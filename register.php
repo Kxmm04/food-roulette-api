@@ -4,6 +4,14 @@ date_default_timezone_set('Asia/Bangkok');
 
 require_once "config.php";
 
+if (!$pdo) {
+    http_response_code(500);
+    echo json_encode([
+        "ok" => false,
+        "message" => "ยังไม่ได้ตั้งค่าฐานข้อมูลบนเซิร์ฟเวอร์"
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 $raw = file_get_contents("php://input");
 $input = json_decode($raw, true);
 if (!is_array($input)) $input = [];

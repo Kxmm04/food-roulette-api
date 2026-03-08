@@ -1,6 +1,8 @@
 <?php
 date_default_timezone_set('Asia/Bangkok');
 
+$pdo = null;
+
 $DB_HOST = getenv('DB_HOST');
 $DB_NAME = getenv('DB_NAME');
 $DB_USER = getenv('DB_USER');
