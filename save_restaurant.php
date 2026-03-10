@@ -13,106 +13,146 @@ if (!is_array($input)) $input = [];
 
 $restaurant_name = trim($input["restaurant_name"] ?? "");
 $address = trim($input["address"] ?? "");
-$avg_price = isset($input["avg_price"]) && $input["avg_price"] !== "" ? (int)$input["avg_price"] : null;
+$avg_price = (int)($input["avg_price"] ?? 0);
+$lat = isset($input["lat"]) ? (float)$input["lat"] : null;
+$lng = isset($input["lng"]) ? (float)$input["lng"] : null;
 
 if ($restaurant_name === "") {
     http_response_code(400);
-    echo json_encode(["ok"=>false,"message"=>"กรุณาระบุ restaurant_name"], JSON_UNESCAPED_UNICODE);
+    echo json_encode([
+        "ok" => false,
+        "message" => "กรุณาระบุชื่อร้าน"
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
+
 if ($address === "") {
-    http_response_code(400);
-    echo json_encode(["ok"=>false,"message"=>"กรุณาระบุ address"], JSON_UNESCAPED_UNICODE);
-    exit;
+    $address = "-";
 }
-if ($avg_price === null || $avg_price <= 0) {
+
+if ($avg_price <= 0) {
+    $avg_price = 50;
+}
+
+if ($lat === null || $lng === null) {
     http_response_code(400);
-    echo json_encode(["ok"=>false,"message"=>"กรุณาระบุ avg_price ให้ถูกต้อง"], JSON_UNESCAPED_UNICODE);
+    echo json_encode([
+        "ok" => false,
+        "message" => "กรุณาระบุ lat และ lng"
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 try {
-    // กันซ้ำแบบง่าย: ชื่อ + ที่อยู่
-    $find = $pdo->prepare("
-        SELECT restaurant_id
-        FROM restaurants
-        WHERE restaurant_name = :name AND address = :address
-        LIMIT 1
-    ");
-    $find->execute([
-        ":name" => $restaurant_name,
-        ":address" => $address
-    ]);
-    $existingRestaurant = $find->fetch(PDO::FETCH_ASSOC);
-
     $pdo->beginTransaction();
 
-    if ($existingRestaurant) {
-        $restaurant_id = (int)$existingRestaurant["restaurant_id"];
-        $createdNew = false;
-    } else {
-        $insR = $pdo->prepare("
-            INSERT INTO restaurants (restaurant_name, address, avg_price, created_at)
-            VALUES (:name, :address, :avg_price, NOW())
+    // เช็คร้านซ้ำในตาราง restaurants
+    $checkRestaurant = $pdo->prepare("
+        SELECT restaurant_id
+        FROM restaurants
+        WHERE restaurant_name = :restaurant_name
+          AND address = :address
+        LIMIT 1
+    ");
+    $checkRestaurant->execute([
+        ":restaurant_name" => $restaurant_name,
+        ":address" => $address
+    ]);
+    $restaurant = $checkRestaurant->fetch(PDO::FETCH_ASSOC);
+
+    if ($restaurant) {
+        $restaurant_id = (int)$restaurant["restaurant_id"];
+
+        // อัปเดตพิกัด/ราคาเผื่อของเดิมยังไม่มี
+        $updateRestaurant = $pdo->prepare("
+            UPDATE restaurants
+            SET avg_price = :avg_price,
+                lat = :lat,
+                lng = :lng
+            WHERE restaurant_id = :restaurant_id
         ");
-        $insR->execute([
-            ":name" => $restaurant_name,
+        $updateRestaurant->execute([
+            ":avg_price" => $avg_price,
+            ":lat" => $lat,
+            ":lng" => $lng,
+            ":restaurant_id" => $restaurant_id
+        ]);
+    } else {
+        // เพิ่มร้านใหม่
+        $insertRestaurant = $pdo->prepare("
+            INSERT INTO restaurants (
+                restaurant_name,
+                address,
+                avg_price,
+                lat,
+                lng
+            ) VALUES (
+                :restaurant_name,
+                :address,
+                :avg_price,
+                :lat,
+                :lng
+            )
+        ");
+        $insertRestaurant->execute([
+            ":restaurant_name" => $restaurant_name,
             ":address" => $address,
-            ":avg_price" => $avg_price
+            ":avg_price" => $avg_price,
+            ":lat" => $lat,
+            ":lng" => $lng
         ]);
 
         $restaurant_id = (int)$pdo->lastInsertId();
-        $createdNew = true;
     }
 
-    // บันทึกลง saved (กันซ้ำ)
-    $dup = $pdo->prepare("
+    // เช็กว่าผู้ใช้บันทึกร้านนี้แล้วหรือยัง
+    $checkSaved = $pdo->prepare("
         SELECT saved_id
         FROM saved
-        WHERE user_id = :user_id AND restaurant_id = :restaurant_id
+        WHERE user_id = :user_id
+          AND restaurant_id = :restaurant_id
         LIMIT 1
     ");
-    $dup->execute([
+    $checkSaved->execute([
         ":user_id" => (int)$user["user_id"],
         ":restaurant_id" => $restaurant_id
     ]);
-    $existingSaved = $dup->fetch(PDO::FETCH_ASSOC);
+    $saved = $checkSaved->fetch(PDO::FETCH_ASSOC);
 
-    if ($existingSaved) {
+    if ($saved) {
         $pdo->commit();
         echo json_encode([
             "ok" => true,
-            "message" => "เคยบันทึกร้านนี้ไว้แล้ว",
-            "restaurant_id" => $restaurant_id,
-            "saved_id" => (int)$existingSaved["saved_id"]
+            "message" => "คุณบันทึกร้านนี้ไว้แล้ว",
+            "restaurant_id" => $restaurant_id
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    $insS = $pdo->prepare("
-        INSERT INTO saved (user_id, restaurant_id, created_at)
-        VALUES (:user_id, :restaurant_id, NOW())
+    // เพิ่มความสัมพันธ์ user กับร้าน
+    $insertSaved = $pdo->prepare("
+        INSERT INTO saved (user_id, restaurant_id)
+        VALUES (:user_id, :restaurant_id)
     ");
-    $insS->execute([
+    $insertSaved->execute([
         ":user_id" => (int)$user["user_id"],
         ":restaurant_id" => $restaurant_id
     ]);
 
-    $saved_id = (int)$pdo->lastInsertId();
-
     $pdo->commit();
 
-    http_response_code($createdNew ? 201 : 200);
     echo json_encode([
         "ok" => true,
-        "message" => $createdNew ? "เพิ่มร้านและบันทึกสำเร็จ" : "บันทึกร้านสำเร็จ",
-        "restaurant_id" => $restaurant_id,
-        "saved_id" => $saved_id
+        "message" => "บันทึกร้านสำเร็จ",
+        "restaurant_id" => $restaurant_id
     ], JSON_UNESCAPED_UNICODE);
     exit;
 
 } catch (PDOException $e) {
-    if ($pdo->inTransaction()) $pdo->rollBack();
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+
     http_response_code(500);
     echo json_encode([
         "ok" => false,

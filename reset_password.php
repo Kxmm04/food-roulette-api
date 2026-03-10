@@ -32,24 +32,20 @@ if (strlen($new_password) < 6) {
 
 try {
     $stmt = $pdo->prepare("
-        SELECT otp_id, expires_at, is_used
+        SELECT reset_id, user_id, email, otp_code, expires_at, is_used
         FROM otp_reset
         WHERE email = :email
-          AND otp_code = :otp_code
-        ORDER BY otp_id DESC
+        ORDER BY reset_id DESC
         LIMIT 1
     ");
-    $stmt->execute([
-        ":email" => $email,
-        ":otp_code" => $otp_code
-    ]);
+    $stmt->execute([":email" => $email]);
     $otp = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$otp) {
-        http_response_code(400);
+        http_response_code(404);
         echo json_encode([
             "ok" => false,
-            "message" => "OTP ไม่ถูกต้อง"
+            "message" => "ไม่พบ OTP ของอีเมลนี้"
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -72,25 +68,34 @@ try {
         exit;
     }
 
+    if ($otp_code !== $otp["otp_code"]) {
+        http_response_code(400);
+        echo json_encode([
+            "ok" => false,
+            "message" => "OTP ไม่ถูกต้อง"
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     $passwordHash = password_hash($new_password, PASSWORD_DEFAULT);
 
     $updUser = $pdo->prepare("
         UPDATE users
-        SET password = :password
-        WHERE email = :email
+        SET password_hash = :password
+        WHERE user_id = :user_id
     ");
     $updUser->execute([
         ":password" => $passwordHash,
-        ":email" => $email
+        ":user_id" => (int)$otp["user_id"]
     ]);
 
     $updOtp = $pdo->prepare("
         UPDATE otp_reset
         SET is_used = 1
-        WHERE otp_id = :otp_id
+        WHERE reset_id = :reset_id
     ");
     $updOtp->execute([
-        ":otp_id" => (int)$otp["otp_id"]
+        ":reset_id" => (int)$otp["reset_id"]
     ]);
 
     echo json_encode([

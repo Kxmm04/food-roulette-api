@@ -42,33 +42,41 @@ try {
         exit;
     }
 
+    $userId = (int)$user["user_id"];
     $otp = str_pad((string)random_int(0, 999999), 6, "0", STR_PAD_LEFT);
     $expiresAt = date("Y-m-d H:i:s", time() + 300); // 5 นาที
 
+    // ล้าง OTP เก่าที่ยังไม่ใช้ของ email นี้ก่อน
+    $del = $pdo->prepare("
+        DELETE FROM otp_reset
+        WHERE email = :email
+          AND is_used = 0
+    ");
+    $del->execute([":email" => $email]);
+
     $ins = $pdo->prepare("
-        INSERT INTO otp_reset (email, otp_code, expires_at, is_used)
-        VALUES (:email, :otp_code, :expires_at, 0)
+        INSERT INTO otp_reset (user_id, email, otp_code, expires_at, is_used)
+        VALUES (:user_id, :email, :otp_code, :expires_at, 0)
     ");
     $ins->execute([
+        ":user_id" => $userId,
         ":email" => $email,
         ":otp_code" => $otp,
         ":expires_at" => $expiresAt
     ]);
 
     $mail = new PHPMailer(true);
-
     $mail->isSMTP();
     $mail->Host       = 'smtp.gmail.com';
     $mail->SMTPAuth   = true;
-    $mail->Username   = 'foodroulettehelp@gmail.com'; // Gmail ผู้ส่ง
-    $mail->Password   = 'sjxprdcxbwjnqzyc'; // App Password 16 ตัว
+    $mail->Username   = 'foodroulettehelp@gmail.com';
+    $mail->Password   = 'sjxprdcxbwjnqzyc';
     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
     $mail->Port       = 587;
 
     $mail->CharSet = 'UTF-8';
     $mail->setFrom('foodroulettehelp@gmail.com', 'Food Roulette');
     $mail->addAddress($email);
-
     $mail->isHTML(true);
     $mail->Subject = 'OTP รีเซ็ตรหัสผ่าน Food Roulette';
     $mail->Body = "
@@ -88,19 +96,19 @@ try {
     ], JSON_UNESCAPED_UNICODE);
     exit;
 
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode([
-        "ok" => false,
-        "message" => "ส่ง OTP ไม่สำเร็จ",
-        "error" => $e->getMessage()
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
 } catch (PDOException $e) {
     http_response_code(500);
     echo json_encode([
         "ok" => false,
         "message" => "บันทึก OTP ไม่สำเร็จ",
+        "error" => $e->getMessage()
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode([
+        "ok" => false,
+        "message" => "ส่ง OTP ไม่สำเร็จ",
         "error" => $e->getMessage()
     ], JSON_UNESCAPED_UNICODE);
     exit;

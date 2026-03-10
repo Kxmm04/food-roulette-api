@@ -15,31 +15,27 @@ if ($email === "" || $otp_code === "") {
     http_response_code(400);
     echo json_encode([
         "ok" => false,
-        "message" => "กรุณาระบุ email และ otp_code"
+        "message" => "กรุณากรอก email และ otp_code"
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 try {
     $stmt = $pdo->prepare("
-        SELECT otp_id, expires_at, is_used
+        SELECT reset_id, user_id, email, otp_code, expires_at, is_used
         FROM otp_reset
         WHERE email = :email
-          AND otp_code = :otp_code
-        ORDER BY otp_id DESC
+        ORDER BY reset_id DESC
         LIMIT 1
     ");
-    $stmt->execute([
-        ":email" => $email,
-        ":otp_code" => $otp_code
-    ]);
+    $stmt->execute([":email" => $email]);
     $otp = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$otp) {
-        http_response_code(400);
+        http_response_code(404);
         echo json_encode([
             "ok" => false,
-            "message" => "OTP ไม่ถูกต้อง"
+            "message" => "ไม่พบ OTP ของอีเมลนี้"
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -58,6 +54,15 @@ try {
         echo json_encode([
             "ok" => false,
             "message" => "OTP หมดอายุแล้ว"
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if ($otp_code !== $otp["otp_code"]) {
+        http_response_code(400);
+        echo json_encode([
+            "ok" => false,
+            "message" => "OTP ไม่ถูกต้อง"
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
