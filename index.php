@@ -1,6 +1,11 @@
 <?php
 header("Content-Type: text/html; charset=utf-8");
 
+$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'];
+$basePath = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+$baseUrl = $scheme . '://' . $host . $basePath;
+
 $files = glob(__DIR__ . "/*.php");
 $endpoints = [];
 foreach ($files as $f) {
@@ -38,12 +43,21 @@ if (isset($_GET["raw"])) {
     body{font-family:system-ui,sans-serif;margin:0;background:#fff;}
     .wrap{
       display:grid;
-      grid-template-columns:0.9fr 1.1fr;
+      grid-template-columns:1fr 1fr;
       gap:16px;
       padding:12px;
-      max-width:1700px;
+      max-width:1800px;
       margin:0 auto;
+      
     }
+
+    .url a{
+  color:#2563eb;
+  text-decoration:none;
+}
+.url a:hover{
+  text-decoration:underline;
+}
     @media (max-width:980px){
       .wrap{grid-template-columns:1fr;}
       .right{position:static;height:auto;}
@@ -73,6 +87,11 @@ if (isset($_GET["raw"])) {
     th{background:#fafafa;font-weight:600;}
     tr:last-child td{border-bottom:none;}
     .muted{color:#666;}
+    .url{
+      word-break:break-word;
+      font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+      font-size:13px;
+    }
     tbody tr{transition:background .18s ease, transform .18s ease, box-shadow .18s ease;}
     tbody tr.activeRow{
       background:#f3f7ff;
@@ -99,6 +118,15 @@ if (isset($_GET["raw"])) {
     }
     .btn:hover{background:#f7f7f7;}
     .btn:active{transform:translateY(1px);}
+    .copyBtn{
+      border:1px solid #ddd;
+      background:#fff;
+      border-radius:10px;
+      padding:6px 10px;
+      cursor:pointer;
+      font-size:12px;
+    }
+    .copyBtn:hover{background:#f7f7f7;}
     .right{
       position:sticky;
       top:12px;
@@ -173,6 +201,7 @@ if (isset($_GET["raw"])) {
       <h2>Food Roulette API</h2>
       <div class="meta">
         <span class="pill">Total: <?= $total ?></span>
+        <span class="muted">Base: <?= htmlspecialchars($baseUrl) ?></span>
       </div>
 
       <div class="bar">
@@ -184,20 +213,30 @@ if (isset($_GET["raw"])) {
         <thead>
           <tr>
             <th style="width:60px;">#</th>
-            <th>Endpoint</th>
+            <th style="width:220px;">Endpoint</th>
+            <th>URL</th>
             <th style="width:140px;">Actions</th>
           </tr>
         </thead>
         <tbody>
           <?php foreach ($endpoints as $i => $e): ?>
+            <?php $url = $baseUrl . '/' . $e; ?>
             <tr data-file="<?= htmlspecialchars($e) ?>">
               <td class="muted"><?= $i + 1 ?></td>
               <td>
-                <b><?= htmlspecialchars($e) ?></b>
-                <?php if (in_array($e, $denyView, true)): ?>
-                  <span class="muted"> (Hidden)</span>
-                <?php endif; ?>
-              </td>
+  <a href="<?= htmlspecialchars($url) ?>" target="_blank">
+    <b><?= htmlspecialchars($e) ?></b>
+  </a>
+  <?php if (in_array($e, $denyView, true)): ?>
+    <span class="muted"> (Hidden)</span>
+  <?php endif; ?>
+</td>
+          <td class="url">
+  <a href="<?= htmlspecialchars($url) ?>" target="_blank">
+    <?= htmlspecialchars($url) ?>
+  </a><br>
+  <button class="copyBtn" type="button" data-copy="<?= htmlspecialchars($url) ?>">คัดลอก URL</button>
+</td>
               <td>
                 <?php if (!in_array($e, $denyView, true)): ?>
                   <button class="btn" type="button" data-code="<?= htmlspecialchars($e) ?>">
@@ -340,6 +379,9 @@ if (isset($_GET["raw"])) {
     document.addEventListener('click', (ev) => {
       const codeBtn = ev.target.closest('[data-code]');
       if (codeBtn) openCode(codeBtn.dataset.code || "");
+
+      const copyBtn = ev.target.closest('[data-copy]');
+      if (copyBtn) copyText(copyBtn.dataset.copy || "");
 
       if (ev.target.closest('#copyCodeBtn')) {
         copyText(codeText.innerText || "");

@@ -1,0 +1,85 @@
+<?php
+header("Content-Type: application/json; charset=UTF-8");
+date_default_timezone_set('Asia/Bangkok');
+
+require_once "config.php";
+require_once "auth.php";
+
+$user = requireAuth($pdo);
+
+$raw = file_get_contents("php://input");
+$input = json_decode($raw, true);
+if (!is_array($input)) $input = [];
+
+$menu_id = (int)($input["menu_id"] ?? 0);
+$menu_name = trim($input["menu_name"] ?? "");
+$price = (int)($input["price"] ?? 0);
+$is_available = isset($input["is_available"]) ? (int)$input["is_available"] : 1;
+
+if ($menu_id <= 0) {
+    http_response_code(400);
+    echo json_encode(["ok" => false, "message" => "กรุณาระบุ menu_id"], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if ($menu_name === "") {
+    http_response_code(400);
+    echo json_encode(["ok" => false, "message" => "กรุณาระบุชื่อเมนู"], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if ($price <= 0) {
+    http_response_code(400);
+    echo json_encode(["ok" => false, "message" => "กรุณาระบุราคาให้ถูกต้อง"], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+try {
+    $chk = $pdo->prepare("
+        SELECT m.menu_id
+        FROM menus m
+        INNER JOIN restaurants r ON r.restaurant_id = m.restaurant_id
+        INNER JOIN saved s ON s.restaurant_id = r.restaurant_id
+        WHERE m.menu_id = :menu_id
+          AND s.user_id = :user_id
+        LIMIT 1
+    ");
+    $chk->execute([
+        ":menu_id" => $menu_id,
+        ":user_id" => (int)$user["user_id"]
+    ]);
+
+    if (!$chk->fetch(PDO::FETCH_ASSOC)) {
+        http_response_code(404);
+        echo json_encode(["ok" => false, "message" => "ไม่พบเมนู"], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $upd = $pdo->prepare("
+        UPDATE menus
+        SET menu_name = :menu_name,
+            price = :price,
+            is_available = :is_available
+        WHERE menu_id = :menu_id
+    ");
+    $upd->execute([
+        ":menu_name" => $menu_name,
+        ":price" => $price,
+        ":is_available" => $is_available,
+        ":menu_id" => $menu_id
+    ]);
+
+    echo json_encode([
+        "ok" => true,
+        "message" => "แก้ไขเมนูสำเร็จ"
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode([
+        "ok" => false,
+        "message" => "แก้ไขเมนูไม่สำเร็จ",
+        "error" => $e->getMessage()
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+?>

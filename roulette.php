@@ -5,7 +5,6 @@ date_default_timezone_set('Asia/Bangkok');
 require_once "config.php";
 require_once "auth.php";
 
-$user = requireAuth($pdo);
 
 function haversineKm($lat1, $lng1, $lat2, $lng2) {
     $earth = 6371.0;
