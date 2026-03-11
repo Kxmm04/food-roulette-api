@@ -6,7 +6,8 @@ require_once "config.php";
 
 $raw = file_get_contents("php://input");
 $input = json_decode($raw, true);
-if (!is_array($input)) $input = [];
+if (!is_array($input)) $input = [
+];
 
 $email = trim($input["email"] ?? "");
 $otp_code = trim($input["otp_code"] ?? "");

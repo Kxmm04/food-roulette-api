@@ -9,7 +9,7 @@ $input = json_decode($raw, true);
 if (!is_array($input)) $input = [];
 
 $email = trim($input["email"] ?? "");
-$password = $input["password"] ?? "";
+$password = trim($input["password"] ?? "");
 
 if ($email === "" || $password === "") {
     http_response_code(400);
